@@ -8,12 +8,16 @@ internal static class OpenAIErrorParser
 	{
 		try
 		{
-			OpenAIErrorEnvelope openAIErrorEnvelope = JsonConvert.DeserializeObject<OpenAIErrorEnvelope>(body);
+			OpenAIErrorEnvelope? openAIErrorEnvelope = JsonConvert.DeserializeObject<OpenAIErrorEnvelope>(body);
 			if (openAIErrorEnvelope?.Error == null)
 			{
 				return (message: null, code: null);
 			}
-			string item = (string.IsNullOrWhiteSpace(openAIErrorEnvelope.Error.Code) ? openAIErrorEnvelope.Error.Type : openAIErrorEnvelope.Error.Code);
+			string? item = openAIErrorEnvelope.Error.Code;
+			if (string.IsNullOrWhiteSpace(item))
+			{
+				item = openAIErrorEnvelope.Error.Type;
+			}
 			return (message: openAIErrorEnvelope.Error.Message, code: item);
 		}
 		catch

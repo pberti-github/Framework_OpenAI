@@ -12,6 +12,9 @@ using Newtonsoft.Json.Linq;
 
 namespace Itecnous.AI.OpenAI.Clients;
 
+/// <summary>
+/// Cliente de bajo nivel para la API de Responses.
+/// </summary>
 public class ResponsesClient : IResponsesClient
 {
 	private readonly HttpClient _httpClient;
@@ -21,6 +24,41 @@ public class ResponsesClient : IResponsesClient
 		_httpClient = httpClient;
 	}
 
+	private static string LeerTexto(JObject root, string propiedad)
+	{
+		JToken? token = root[propiedad];
+		if (token == null)
+		{
+			return string.Empty;
+		}
+		return token.ToString();
+	}
+
+	private static string LeerTexto(JToken? token)
+	{
+		if (token == null)
+		{
+			return string.Empty;
+		}
+		return token.ToString();
+	}
+
+	private static int? LeerEntero(JToken? token)
+	{
+		if (token == null)
+		{
+			return null;
+		}
+		if (int.TryParse(token.ToString(), out int valor))
+		{
+			return valor;
+		}
+		return null;
+	}
+
+	/// <summary>
+	/// Crea una respuesta usando la API Responses.
+	/// </summary>
 	public async Task<ResponseCreateResult> CreateAsync(ResponseCreateRequest request, CancellationToken ct = default(CancellationToken))
 	{
 		Dictionary<string, object> dictionary = new Dictionary<string, object>
@@ -93,43 +131,51 @@ public class ResponsesClient : IResponsesClient
 			CompletionTokens = LeerEnteroNullable(val2, "usage.output_tokens", "usage.outputTokens", "usage.completion_tokens", "usage.completionTokens"),
 			TotalTokens = LeerEnteroNullable(val2, "usage.total_tokens", "usage.totalTokens")
 		};
+		string id = LeerTexto(val2, "id");
 		ResponseCreateResult responseCreateResult = new ResponseCreateResult
 		{
-			Id = (((object)val2["id"])?.ToString() ?? string.Empty),
-			ResponseId = ((object)val2["id"])?.ToString(),
+			Id = id,
+			ResponseId = id,
 			Usage = usage,
 			OutputText = outputText,
-			Model = ((object)val2["model"])?.ToString()
+			Model = LeerTexto(val2, "model")
 		};
-		if (response.Headers.TryGetValues("openai-conversation-id", out IEnumerable<string> values))
+		if (response.Headers.TryGetValues("openai-conversation-id", out IEnumerable<string>? values))
 		{
-			responseCreateResult.ConversationId = values.FirstOrDefault();
+			foreach (string value in values)
+			{
+				if (!string.IsNullOrWhiteSpace(value))
+				{
+					responseCreateResult.ConversationId = value;
+					break;
+				}
+			}
 		}
 		return responseCreateResult;
 	}
 
 	private static string ExtraerTextoSalida(JObject root)
 	{
-		string texto = root.Value<string>("output_text");
+		string texto = LeerTexto(root, "output_text");
 		if (!string.IsNullOrWhiteSpace(texto))
 		{
 			return texto.Trim();
 		}
-		JToken output = root["output"];
+		JToken? output = root["output"];
 		if (output != null)
 		{
 			foreach (JToken item in output.Children())
 			{
 				if (string.Equals(item.Value<string>("type"), "message", StringComparison.OrdinalIgnoreCase))
 				{
-					JToken content = item["content"];
+					JToken? content = item["content"];
 					if (content != null)
 					{
 						foreach (JToken contentItem in content.Children())
 						{
 							if (string.Equals(contentItem.Value<string>("type"), "output_text", StringComparison.OrdinalIgnoreCase))
 							{
-								string text = contentItem.Value<string>("text");
+								string text = LeerTexto(contentItem["text"]);
 								if (!string.IsNullOrWhiteSpace(text))
 								{
 									return text.Trim();
@@ -147,20 +193,28 @@ public class ResponsesClient : IResponsesClient
 	{
 		foreach (string path in paths)
 		{
-			JToken token = root.SelectToken(path);
-			if (token != null && int.TryParse(token.ToString(), out int valor))
+			JToken? token = root.SelectToken(path);
+			int? valor = LeerEntero(token);
+			if (valor.HasValue)
 			{
-				return valor;
+				return valor.Value;
 			}
 		}
 		return null;
 	}
 
+	/// <summary>
+	/// Crea una respuesta asociando un archivo a la entrada.
+	/// </summary>
 	public async Task<ResponseCreateResult> CreateWithFileAsync(string model, string instructions, string userText, string fileId, double? temperature = null, double? topP = null, int? maxOutputTokens = null, string? responseFormatType = null, CancellationToken ct = default(CancellationToken))
 	{
 		if (!string.IsNullOrWhiteSpace(responseFormatType) && (responseFormatType.Equals("json", StringComparison.OrdinalIgnoreCase) || responseFormatType.Equals("json_object", StringComparison.OrdinalIgnoreCase)))
 		{
-			string text = userText ?? string.Empty;
+			string text = userText;
+			if (string.IsNullOrWhiteSpace(text))
+			{
+				text = string.Empty;
+			}
 			if (!text.Contains("json", StringComparison.OrdinalIgnoreCase))
 			{
 				text = (text + " Devuelve la salida en json válido.").Trim();
@@ -212,83 +266,55 @@ public class ResponsesClient : IResponsesClient
 			throw new HttpRequestException($"OpenAI API Error ({response.StatusCode}): {value}");
 		}
 		JObject val = JObject.Parse(await response.Content.ReadAsStringAsync(ct));
-		JToken obj = val["output"];
-		object obj2;
-		if (obj == null)
+		string outputText = string.Empty;
+		JToken? output = val["output"];
+		if (output != null)
 		{
-			obj2 = null;
-		}
-		else
-		{
-			JToken? obj3 = ((IEnumerable<JToken>)obj).FirstOrDefault((Func<JToken, bool>)((JToken t) => string.Equals((string)((t != null) ? t[(object)"type"] : null), "message", StringComparison.OrdinalIgnoreCase)));
-			if (obj3 == null)
+			foreach (JToken item in output.Children())
 			{
-				obj2 = null;
-			}
-			else
-			{
-				JToken obj4 = obj3[(object)"content"];
-				if (obj4 == null)
+				if (!string.Equals(item.Value<string>("type"), "message", StringComparison.OrdinalIgnoreCase))
 				{
-					obj2 = null;
+					continue;
 				}
-				else
+				JToken? contentNode = item["content"];
+				if (contentNode == null)
 				{
-					JToken? obj5 = ((IEnumerable<JToken>)obj4).FirstOrDefault((Func<JToken, bool>)((JToken t) => string.Equals((string)((t != null) ? t[(object)"type"] : null), "output_text", StringComparison.OrdinalIgnoreCase)));
-					obj2 = ((obj5 == null) ? null : ((object)obj5[(object)"text"])?.ToString());
+					continue;
+				}
+				foreach (JToken contentItem in contentNode.Children())
+				{
+					if (!string.Equals(contentItem.Value<string>("type"), "output_text", StringComparison.OrdinalIgnoreCase))
+					{
+						continue;
+					}
+					string text = LeerTexto(contentItem["text"]);
+					if (!string.IsNullOrWhiteSpace(text))
+					{
+						outputText = text;
+						break;
+					}
+				}
+				if (!string.IsNullOrWhiteSpace(outputText))
+				{
+					break;
 				}
 			}
 		}
-		if (obj2 == null)
-		{
-			obj2 = string.Empty;
-		}
-		string outputText = (string)obj2;
 		ResponsesUsage responsesUsage = new ResponsesUsage();
-		JToken obj6 = val["usage"];
-		int? promptTokens;
-		if (obj6 == null)
+		JToken? usage = val["usage"];
+		if (usage != null)
 		{
-			promptTokens = null;
+			responsesUsage.PromptTokens = LeerEntero(usage["input_tokens"]);
+			responsesUsage.CompletionTokens = LeerEntero(usage["output_tokens"]);
+			responsesUsage.TotalTokens = LeerEntero(usage["total_tokens"]);
 		}
-		else
-		{
-			JToken obj7 = obj6[(object)"input_tokens"];
-			promptTokens = obj7?.Value<int?>();
-		}
-		responsesUsage.PromptTokens = promptTokens;
-		JToken obj8 = val["usage"];
-		int? completionTokens;
-		if (obj8 == null)
-		{
-			completionTokens = null;
-		}
-		else
-		{
-			JToken obj9 = obj8[(object)"output_tokens"];
-			completionTokens = obj9?.Value<int?>();
-		}
-		responsesUsage.CompletionTokens = completionTokens;
-		JToken obj10 = val["usage"];
-		int? totalTokens;
-		if (obj10 == null)
-		{
-			totalTokens = null;
-		}
-		else
-		{
-			JToken obj11 = obj10[(object)"total_tokens"];
-			totalTokens = obj11?.Value<int?>();
-		}
-		responsesUsage.TotalTokens = totalTokens;
-		ResponsesUsage usage = responsesUsage;
 		return new ResponseCreateResult
 		{
-			Id = (((object)val["id"])?.ToString() ?? string.Empty),
-			ResponseId = ((object)val["id"])?.ToString(),
+			Id = LeerTexto(val, "id"),
+			ResponseId = LeerTexto(val, "id"),
 			OutputText = outputText,
-			Model = ((object)val["model"])?.ToString(),
-			Usage = usage
+			Model = LeerTexto(val, "model"),
+			Usage = responsesUsage
 		};
 	}
 }

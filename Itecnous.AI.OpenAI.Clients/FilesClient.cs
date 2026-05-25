@@ -13,6 +13,9 @@ using Newtonsoft.Json;
 
 namespace Itecnous.AI.OpenAI.Clients;
 
+/// <summary>
+/// Cliente de bajo nivel para la API de Files.
+/// </summary>
 public class FilesClient : IFilesClient
 {
 	private readonly OpenAISettings _settings;
@@ -22,6 +25,28 @@ public class FilesClient : IFilesClient
 		_settings = settings;
 	}
 
+	private static string ObtenerMensajeError(string? mensaje, string mensajePorDefecto)
+	{
+		if (!string.IsNullOrWhiteSpace(mensaje))
+		{
+			return mensaje;
+		}
+		return mensajePorDefecto;
+	}
+
+	private static T DeserializarRequerido<T>(string texto, HttpStatusCode statusCode, string mensajePorDefecto, string cuerpo) where T : class
+	{
+		T? data = JsonConvert.DeserializeObject<T>(texto);
+		if (data == null)
+		{
+			throw new OpenAIClientException(mensajePorDefecto, statusCode, null, cuerpo);
+		}
+		return data;
+	}
+
+	/// <summary>
+	/// Sube un archivo a OpenAI.
+	/// </summary>
 	public async Task<FileUploadResponse> UploadAsync(string filePath, string purpose, Dictionary<string, string>? metadata = null, int? expiresAfterSeconds = null, string expiresAfterAnchor = "created_at", CancellationToken ct = default(CancellationToken))
 	{
 		_ = 2;
@@ -49,9 +74,9 @@ public class FilesClient : IFilesClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al subir archivo.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al subir archivo."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<FileUploadResponse>(text);
+			return DeserializarRequerido<FileUploadResponse>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -63,6 +88,9 @@ public class FilesClient : IFilesClient
 		}
 	}
 
+	/// <summary>
+	/// Obtiene la metadata de un archivo.
+	/// </summary>
 	public async Task<FileData> GetAsync(string fileId, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -74,9 +102,9 @@ public class FilesClient : IFilesClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al obtener archivo.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al obtener archivo."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<FileData>(text);
+			return DeserializarRequerido<FileData>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -88,6 +116,9 @@ public class FilesClient : IFilesClient
 		}
 	}
 
+	/// <summary>
+	/// Lista los archivos disponibles.
+	/// </summary>
 	public async Task<FilesList> ListAsync(CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -99,9 +130,9 @@ public class FilesClient : IFilesClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al listar archivos.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al listar archivos."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<FilesList>(text);
+			return DeserializarRequerido<FilesList>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -113,6 +144,9 @@ public class FilesClient : IFilesClient
 		}
 	}
 
+	/// <summary>
+	/// Elimina un archivo por su identificador.
+	/// </summary>
 	public async Task<bool> DeleteAsync(string fileId, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -124,7 +158,7 @@ public class FilesClient : IFilesClient
 			{
 				string text = await resp.Content.ReadAsStringAsync(ct);
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al eliminar archivo.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al eliminar archivo."), resp.StatusCode, openAIErrorCode, text);
 			}
 			return true;
 		}
@@ -138,6 +172,9 @@ public class FilesClient : IFilesClient
 		}
 	}
 
+	/// <summary>
+	/// Descarga el contenido binario de un archivo.
+	/// </summary>
 	public async Task<byte[]> DownloadContentAsync(string fileId, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 2;
@@ -149,7 +186,7 @@ public class FilesClient : IFilesClient
 			{
 				string text = await resp.Content.ReadAsStringAsync(ct);
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al descargar contenido.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al descargar contenido."), resp.StatusCode, openAIErrorCode, text);
 			}
 			return await resp.Content.ReadAsByteArrayAsync(ct);
 		}

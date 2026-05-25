@@ -17,6 +17,9 @@ using Newtonsoft.Json.Linq;
 
 namespace Itecnous.AI.OpenAI.Clients;
 
+/// <summary>
+/// Cliente de bajo nivel para la API de Assistants.
+/// </summary>
 public class AssistantsClient : IAssistantsClient
 {
 	private readonly OpenAISettings _settings;
@@ -28,6 +31,28 @@ public class AssistantsClient : IAssistantsClient
 		_settings = settings;
 	}
 
+	private static string ObtenerMensajeError(string? mensaje, string mensajePorDefecto)
+	{
+		if (!string.IsNullOrWhiteSpace(mensaje))
+		{
+			return mensaje;
+		}
+		return mensajePorDefecto;
+	}
+
+	private static T DeserializarRequerido<T>(string texto, HttpStatusCode statusCode, string mensajePorDefecto, string cuerpo) where T : class
+	{
+		T? data = JsonConvert.DeserializeObject<T>(texto);
+		if (data == null)
+		{
+			throw new OpenAIClientException(mensajePorDefecto, statusCode, null, cuerpo);
+		}
+		return data;
+	}
+
+	/// <summary>
+	/// Crea un thread nuevo en Assistants.
+	/// </summary>
 	public async Task<ThreadCreateResponse> CreateThreadAsync(CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -39,9 +64,9 @@ public class AssistantsClient : IAssistantsClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al crear thread.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al crear thread."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<ThreadCreateResponse>(text);
+			return DeserializarRequerido<ThreadCreateResponse>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -53,6 +78,9 @@ public class AssistantsClient : IAssistantsClient
 		}
 	}
 
+	/// <summary>
+	/// Agrega un mensaje a un thread existente.
+	/// </summary>
 	public async Task<MessageResponse> AddMessageAsync(string threadId, string role, string content, IEnumerable<MessageAttachment>? attachments = null, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -70,9 +98,9 @@ public class AssistantsClient : IAssistantsClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al agregar mensaje.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al agregar mensaje."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<MessageResponse>(text);
+			return DeserializarRequerido<MessageResponse>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -84,6 +112,9 @@ public class AssistantsClient : IAssistantsClient
 		}
 	}
 
+	/// <summary>
+	/// Obtiene el texto del ultimo mensaje de un thread.
+	/// </summary>
 	public async Task<string?> GetLastMessageTextAsync(string threadId, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -95,22 +126,23 @@ public class AssistantsClient : IAssistantsClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al listar mensajes.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al listar mensajes."), resp.StatusCode, openAIErrorCode, text);
 			}
-			JToken obj = JObject.Parse(text)["data"];
-			JToken? obj2 = ((IEnumerable<JToken>)((obj is JArray) ? obj : null))?.FirstOrDefault();
-			JToken? obj3 = ((obj2 is JObject) ? obj2 : null);
-			JToken obj4 = ((obj3 != null) ? ((JObject)obj3)["content"] : null);
-			JArray val = (JArray)(object)((obj4 is JArray) ? obj4 : null);
-			if (val != null)
+			JToken? data = JObject.Parse(text)["data"];
+			JArray? messages = data as JArray;
+			if (messages != null)
 			{
-				foreach (JObject item in ((IEnumerable)val).OfType<JObject>())
+				foreach (JObject item in messages.OfType<JObject>())
 				{
-					if (((JToken)item).Value<string>((object)"type") == "text")
+					if (string.Equals(item.Value<string>("type"), "text", StringComparison.OrdinalIgnoreCase))
 					{
-						JToken obj5 = item["text"];
-						JToken obj6 = ((obj5 is JObject) ? obj5 : null);
-						string text3 = ((obj6 != null) ? obj6.Value<string>((object)"value") : null);
+						JToken? textNode = item["text"];
+						JObject? textObject = textNode as JObject;
+						string? text3 = null;
+						if (textObject != null)
+						{
+							text3 = textObject.Value<string>("value");
+						}
 						if (!string.IsNullOrEmpty(text3))
 						{
 							return text3;
@@ -130,6 +162,9 @@ public class AssistantsClient : IAssistantsClient
 		}
 	}
 
+	/// <summary>
+	/// Crea un run para un assistant concreto.
+	/// </summary>
 	public async Task<RunResponse> CreateRunAsync(string threadId, string assistantId, string? additionalInstructions = null, ResponseFormat? responseFormat = null, ToolResources? toolResources = null, double? temperature = null, int? maxOutputTokens = null, double? topP = null, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -154,9 +189,9 @@ public class AssistantsClient : IAssistantsClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al crear run.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al crear run."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<RunResponse>(text);
+			return DeserializarRequerido<RunResponse>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -168,6 +203,9 @@ public class AssistantsClient : IAssistantsClient
 		}
 	}
 
+	/// <summary>
+	/// Consulta el estado de un run.
+	/// </summary>
 	public async Task<RunResponse> GetRunAsync(string threadId, string runId, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -179,9 +217,9 @@ public class AssistantsClient : IAssistantsClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al obtener run.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al obtener run."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<RunResponse>(text);
+			return DeserializarRequerido<RunResponse>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -193,6 +231,9 @@ public class AssistantsClient : IAssistantsClient
 		}
 	}
 
+	/// <summary>
+	/// Obtiene los pasos ejecutados por un run.
+	/// </summary>
 	public async Task<RunStepsResponse> GetRunStepsAsync(string threadId, string runId, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -204,9 +245,9 @@ public class AssistantsClient : IAssistantsClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al obtener steps.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al obtener steps."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<RunStepsResponse>(text);
+			return DeserializarRequerido<RunStepsResponse>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -218,6 +259,9 @@ public class AssistantsClient : IAssistantsClient
 		}
 	}
 
+	/// <summary>
+	/// Envía los tool outputs pendientes al run.
+	/// </summary>
 	public async Task<RunResponse> SubmitToolOutputsAsync(string threadId, string runId, IEnumerable<ToolOutput> outputs, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -233,9 +277,9 @@ public class AssistantsClient : IAssistantsClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al enviar tool outputs.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al enviar tool outputs."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<RunResponse>(text);
+			return DeserializarRequerido<RunResponse>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -247,6 +291,9 @@ public class AssistantsClient : IAssistantsClient
 		}
 	}
 
+	/// <summary>
+	/// Ejecuta un flujo completo de Assistants hasta completarlo o agotar el timeout.
+	/// </summary>
 	public async Task<RunCompletionResult> RunToCompletionAsync(string threadId, string assistantId, string role, string content, IEnumerable<MessageAttachment>? attachments = null, string? additionalInstructions = null, ResponseFormat? responseFormat = null, ToolResources? toolResources = null, TimeSpan? pollingDelay = null, TimeSpan? overallTimeout = null, CancellationToken ct = default(CancellationToken))
 	{
 		pollingDelay.GetValueOrDefault();
@@ -272,11 +319,16 @@ public class AssistantsClient : IAssistantsClient
 				RunResponse runResponse = await GetRunAsync(threadId, run.Id, cts.Token);
 				if (runResponse.Status == "completed")
 				{
+					string? model = runResponse.Model;
+					if (string.IsNullOrWhiteSpace(model))
+					{
+						model = run.Model;
+					}
 					return new RunCompletionResult
 					{
 						RunId = run.Id,
 						Status = runResponse.Status,
-						Model = (runResponse.Model ?? run.Model),
+						Model = model,
 						PromptTokens = runResponse.Usage?.PromptTokens,
 						CompletionTokens = runResponse.Usage?.CompletionTokens,
 						TotalTokens = runResponse.Usage?.TotalTokens

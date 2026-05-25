@@ -18,12 +18,12 @@ public static class AttributeNormalizer
 	public static Dictionary<string, object> NormalizeFromPairs(IEnumerable<KeyValuePair<string, object?>> pairs)
 	{
 		Dictionary<string, object> dictionary = new Dictionary<string, object>();
-		foreach (KeyValuePair<string, object> pair in pairs)
+		foreach (KeyValuePair<string, object?> pair in pairs)
 		{
 			string text = SanitizeKey(pair.Key);
 			if (!string.IsNullOrWhiteSpace(text))
 			{
-				object obj = NormalizeValue(pair.Value);
+				object? obj = NormalizeValue(pair.Value);
 				if (obj != null)
 				{
 					dictionary[text] = obj;
@@ -109,7 +109,7 @@ public static class AttributeNormalizer
 		{
 			return value;
 		}
-		string text2 = value.ToString();
+		string? text2 = value.ToString();
 		if (string.IsNullOrWhiteSpace(text2))
 		{
 			return null;

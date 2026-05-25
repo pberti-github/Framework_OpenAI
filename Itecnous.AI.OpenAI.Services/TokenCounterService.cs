@@ -18,6 +18,6 @@ public class TokenCounterService
 		{
 			return 0;
 		}
-		return _encoding.Encode(text, (ISet<string>)null, (ISet<string>)null).Count;
+		return _encoding.Encode(text).Count;
 	}
 }

@@ -25,9 +25,15 @@ internal static class OpenAIHttpClient
 			string uriString;
 			if (!string.IsNullOrEmpty(modelForAzure))
 			{
-				if (!settings.DeploymentMappings.TryGetValue(modelForAzure, out string value))
+				string? value = null;
+				string? mapping = null;
+				if (!settings.DeploymentMappings.TryGetValue(modelForAzure, out mapping) || string.IsNullOrWhiteSpace(mapping))
 				{
 					value = modelForAzure;
+				}
+				else
+				{
+					value = mapping;
 				}
 				uriString = text + "/openai/deployments/" + value + "/";
 			}

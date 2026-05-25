@@ -13,6 +13,9 @@ using Newtonsoft.Json;
 
 namespace Itecnous.AI.OpenAI.Clients;
 
+/// <summary>
+/// Cliente de bajo nivel para la API de Vector Stores.
+/// </summary>
 public class VectorStoresClient : IVectorStoresClient
 {
 	private readonly OpenAISettings _settings;
@@ -24,6 +27,28 @@ public class VectorStoresClient : IVectorStoresClient
 		_settings = settings;
 	}
 
+	private static string ObtenerMensajeError(string? mensaje, string mensajePorDefecto)
+	{
+		if (!string.IsNullOrWhiteSpace(mensaje))
+		{
+			return mensaje;
+		}
+		return mensajePorDefecto;
+	}
+
+	private static T DeserializarRequerido<T>(string texto, HttpStatusCode statusCode, string mensajePorDefecto, string cuerpo) where T : class
+	{
+		T? data = JsonConvert.DeserializeObject<T>(texto);
+		if (data == null)
+		{
+			throw new OpenAIClientException(mensajePorDefecto, statusCode, null, cuerpo);
+		}
+		return data;
+	}
+
+	/// <summary>
+	/// Crea un vector store nuevo.
+	/// </summary>
 	public async Task<VectorStore> CreateAsync(string name, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -36,9 +61,9 @@ public class VectorStoresClient : IVectorStoresClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al crear vector store.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al crear vector store."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<VectorStore>(text);
+			return DeserializarRequerido<VectorStore>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -50,6 +75,9 @@ public class VectorStoresClient : IVectorStoresClient
 		}
 	}
 
+	/// <summary>
+	/// Lista los vector stores disponibles.
+	/// </summary>
 	public async Task<VectorStoresList> ListAsync(CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -61,9 +89,9 @@ public class VectorStoresClient : IVectorStoresClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al listar vector stores.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al listar vector stores."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<VectorStoresList>(text);
+			return DeserializarRequerido<VectorStoresList>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -75,6 +103,9 @@ public class VectorStoresClient : IVectorStoresClient
 		}
 	}
 
+	/// <summary>
+	/// Recupera un vector store por identificador.
+	/// </summary>
 	public async Task<VectorStore> RetrieveAsync(string id, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -86,9 +117,9 @@ public class VectorStoresClient : IVectorStoresClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al recuperar vector store.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al recuperar vector store."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<VectorStore>(text);
+			return DeserializarRequerido<VectorStore>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -100,6 +131,9 @@ public class VectorStoresClient : IVectorStoresClient
 		}
 	}
 
+	/// <summary>
+	/// Agrega un archivo a un vector store.
+	/// </summary>
 	public async Task<VectorStoreFile> AddFileAsync(string vectorStoreId, string fileId, object? attributes = null, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -119,9 +153,9 @@ public class VectorStoresClient : IVectorStoresClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al agregar archivo al vector store.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al agregar archivo al vector store."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<VectorStoreFile>(text);
+			return DeserializarRequerido<VectorStoreFile>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -133,6 +167,9 @@ public class VectorStoresClient : IVectorStoresClient
 		}
 	}
 
+	/// <summary>
+	/// Recupera un archivo asociado a un vector store.
+	/// </summary>
 	public async Task<VectorStoreFile> RetrieveFileAsync(string vectorStoreId, string fileId, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -144,9 +181,9 @@ public class VectorStoresClient : IVectorStoresClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al recuperar archivo del vector store.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al recuperar archivo del vector store."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<VectorStoreFile>(text);
+			return DeserializarRequerido<VectorStoreFile>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -158,6 +195,9 @@ public class VectorStoresClient : IVectorStoresClient
 		}
 	}
 
+	/// <summary>
+	/// Actualiza los atributos de un archivo asociado a un vector store.
+	/// </summary>
 	public async Task<bool> UpdateFileAttributesAsync(string vectorStoreId, string fileId, Dictionary<string, object> attributes, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -175,7 +215,7 @@ public class VectorStoresClient : IVectorStoresClient
 			{
 				string text = await resp.Content.ReadAsStringAsync(ct);
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al actualizar atributos del archivo del vector store.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al actualizar atributos del archivo del vector store."), resp.StatusCode, openAIErrorCode, text);
 			}
 			return true;
 		}
@@ -200,7 +240,7 @@ public class VectorStoresClient : IVectorStoresClient
 			{
 				string text = await resp.Content.ReadAsStringAsync(ct);
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al desadjuntar archivo del vector store.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al desadjuntar archivo del vector store."), resp.StatusCode, openAIErrorCode, text);
 			}
 			return true;
 		}
@@ -214,6 +254,9 @@ public class VectorStoresClient : IVectorStoresClient
 		}
 	}
 
+	/// <summary>
+	/// Lista los archivos de un vector store.
+	/// </summary>
 	public async Task<VectorStoreFilesList> ListFilesAsync(string vectorStoreId, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -225,9 +268,9 @@ public class VectorStoresClient : IVectorStoresClient
 			if (!resp.IsSuccessStatusCode)
 			{
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al listar archivos del vector store.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al listar archivos del vector store."), resp.StatusCode, openAIErrorCode, text);
 			}
-			return JsonConvert.DeserializeObject<VectorStoreFilesList>(text);
+			return DeserializarRequerido<VectorStoreFilesList>(text, resp.StatusCode, "Respuesta invalida.", text);
 		}
 		catch (OpenAIClientException)
 		{
@@ -239,6 +282,9 @@ public class VectorStoresClient : IVectorStoresClient
 		}
 	}
 
+	/// <summary>
+	/// Elimina un vector store.
+	/// </summary>
 	public async Task<bool> DeleteAsync(string vectorStoreId, CancellationToken ct = default(CancellationToken))
 	{
 		_ = 1;
@@ -250,7 +296,7 @@ public class VectorStoresClient : IVectorStoresClient
 			{
 				string text = await resp.Content.ReadAsStringAsync(ct);
 				var (text2, openAIErrorCode) = OpenAIErrorParser.TryParse(text);
-				throw new OpenAIClientException(text2 ?? "Error al eliminar vector store.", resp.StatusCode, openAIErrorCode, text);
+				throw new OpenAIClientException(ObtenerMensajeError(text2, "Error al eliminar vector store."), resp.StatusCode, openAIErrorCode, text);
 			}
 			return true;
 		}

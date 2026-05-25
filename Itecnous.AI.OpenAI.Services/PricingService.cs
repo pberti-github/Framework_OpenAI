@@ -19,7 +19,7 @@ public class PricingService
 		}
 		int valueOrDefault = inputTokens.GetValueOrDefault();
 		int valueOrDefault2 = outputTokens.GetValueOrDefault();
-		if (_settings.Pricing != null && _settings.Pricing.TryGetValue(model, out ModelPricing value))
+		if (_settings.Pricing != null && _settings.Pricing.TryGetValue(model, out ModelPricing? value) && value != null)
 		{
 			return Calculate(valueOrDefault, valueOrDefault2, value.InputCostPer1M, value.OutputCostPer1M);
 		}
@@ -76,7 +76,7 @@ public class PricingService
 	public decimal CalculateAudioCost(double seconds, string model = "whisper-1")
 	{
 		decimal num = (decimal)(seconds / 60.0);
-		if (_settings.Pricing != null && _settings.Pricing.TryGetValue(model, out ModelPricing value) && value.AudioCostPerMinute.HasValue)
+		if (_settings.Pricing != null && _settings.Pricing.TryGetValue(model, out ModelPricing? value) && value != null && value.AudioCostPerMinute.HasValue)
 		{
 			return num * value.AudioCostPerMinute.Value;
 		}
